@@ -45,13 +45,15 @@ def save_history(history: set[str]) -> None:
 
 
 def clean_text(value: str) -> str:
+    # نحذف أي تذييل اشتراك أو رابط Telegram وارد من المصدر قبل التنسيق.
     value = re.sub(
-        r"(?:\n+ـ{5,})?\n*للاشتراك(?: بالقناة)? عبر تيليجرام:?\s*\n+"
-        r"https?://t\.me/(?:AbdmomenShjaaAldeen|qada_a)\S*.*$",
+        r"(?:\n+ـ{5,})?\n*للاشتراك(?: بالقناة)? عبر تيليجرام:?\s*\n*"
+        r"(?:https?://)?t\.me/\S*.*$",
         "",
         value,
         flags=re.IGNORECASE | re.DOTALL,
     )
+
     lines = []
     for line in value.splitlines():
         stripped = line.strip()
@@ -60,10 +62,21 @@ def clean_text(value: str) -> str:
             break
         if re.search(r"(?:رويترز|Reuters)\s*[•·-]", stripped):
             break
-        if stripped.startswith("https://t.me/"):
-            break
+        # لا نسمح بظهور روابط أو معرّفات القنوات داخل الخبر المنشور.
+        if re.search(r"(?:https?://|www\.)\S+|t\.me/\S+", stripped, re.IGNORECASE):
+            continue
+        if re.search(
+            r"@?(?:AbdmomenShjaaAldeen|qada_a|muen2025)\b|"
+            r"منصة\s+الناصر\s+القانونية|رويترز|Reuters",
+            stripped,
+            re.IGNORECASE,
+        ):
+            continue
         lines.append(line)
-    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+
+    cleaned = "\n".join(lines)
+    cleaned = re.sub(r"(?:https?://|www\.)\S+|t\.me/\S+", "", cleaned, flags=re.IGNORECASE)
+    return re.sub(r"\n{3,}", "\n\n", cleaned).strip()
 
 
 def extract_message_text(text_node) -> str:
@@ -146,7 +159,7 @@ def format_message(post: dict[str, str]) -> str:
         parts.append(f"<blockquote expandable>\n{html.escape(summary)}\n</blockquote>")
     parts.append(
         "ــــــــــــــــــــــــــــ\n\n"
-        "للاشتراك بالقناة عبر تيليجرام:\n"
+        "للاشتراك بالقناة عبر تيليجرام\n"
         "https://t.me/muen2025"
     )
     return "\n\n".join(parts)
