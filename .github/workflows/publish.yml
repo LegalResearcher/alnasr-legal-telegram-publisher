@@ -4,9 +4,6 @@ on:
   workflow_dispatch:
   repository_dispatch:
     types: [alymenet-breaking-publish]
-  schedule:
-    - cron: "*/5 * * * *"
-
 permissions:
   contents: write
 
