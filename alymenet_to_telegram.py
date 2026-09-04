@@ -53,7 +53,19 @@ def clean_text(value: str) -> str:
         value,
         flags=re.IGNORECASE | re.DOTALL,
     )
-    return re.sub(r"\n{3,}", "\n\n", value).strip()
+    lines = []
+    for line in value.splitlines():
+        stripped = line.strip()
+        # منشورات Reuters العربية تتبع النص العربي بنسخة إنجليزية.
+        # نوقف القراءة عند أول سطر إنجليزي، مع الإبقاء على الرموز السابقة له.
+        if re.match(r"^[^\u0600-\u06FF\n]*[A-Za-z]", stripped):
+            break
+        if re.search(r"(?:رويترز|Reuters)\s*[•·-]", stripped):
+            break
+        if stripped.startswith("https://t.me/"):
+            break
+        lines.append(line)
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
 
 
 def fetch_posts() -> list[dict[str, str]]:
@@ -110,12 +122,13 @@ def fetch_posts() -> list[dict[str, str]]:
 
 
 def format_message(post: dict[str, str]) -> str:
-    return (
+    body = (
         f"{html.escape(post['text'])}\n"
-        "ــــــــــــــــــــــــــــ\n"
+        "ــــــــــــــــــــــــــــ\n\n"
         "للاشتراك بالقناة عبر تيليجرام:\n"
         "https://t.me/hasadalyoum"
     )
+    return f"<b>{body}</b>"
 
 
 def send_to_telegram(post: dict[str, str]) -> bool:
