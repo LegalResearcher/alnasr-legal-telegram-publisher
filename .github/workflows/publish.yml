@@ -1,4 +1,4 @@
-name: نشر منشورات ALYMENET
+name: نشر منشورات Reuters بالعربية
 
 on:
   workflow_dispatch:
@@ -32,10 +32,10 @@ jobs:
       - name: استعادة سجل المنشورات
         uses: actions/cache@v4
         with:
-          path: alymenet_history.json
-          key: alymenet-history-${{ github.run_id }}
+          path: reuters_ar_history.json
+          key: reuters-ar-history-${{ github.run_id }}
           restore-keys: |
-            alymenet-history-
+            reuters-ar-history-
 
       - name: تشغيل الناشر
         env:
@@ -46,10 +46,10 @@ jobs:
       - name: حفظ سجل المنشورات في المستودع
         if: success()
         run: |
-          if [ -f alymenet_history.json ] && [ -n "$(git status --porcelain alymenet_history.json)" ]; then
+          if [ -f reuters_ar_history.json ] && [ -n "$(git status --porcelain reuters_ar_history.json)" ]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add alymenet_history.json
+            git add reuters_ar_history.json
             git commit -m "chore: update Alymenet history" || true
             git push || true
           fi

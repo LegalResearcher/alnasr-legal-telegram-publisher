@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""نشر منشورات قناة Telegram العامة @ALYMENET إلى قناة أخرى عبر Bot API.
+"""نشر منشورات قناة Telegram العامة @reuters_Ar إلى قناة أخرى عبر Bot API.
 
 لا يستخدم Userbot: يقرأ صفحة المعاينة العامة t.me/s ثم ينشر النص والوسائط المتاحة.
 """
@@ -15,16 +15,16 @@ from pathlib import Path
 import requests
 from bs4 import BeautifulSoup
 
-SOURCE_USERNAME = "ALYMENET"
+SOURCE_USERNAME = "reuters_Ar"
 SOURCE_URL = f"https://t.me/s/{SOURCE_USERNAME}"
 BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 DESTINATION = os.environ["TELEGRAM_CHANNEL_ID"]
-HISTORY_FILE = Path(os.environ.get("HISTORY_FILE", "alymenet_history.json"))
+HISTORY_FILE = Path(os.environ.get("HISTORY_FILE", "reuters_ar_history.json"))
 MAX_HISTORY = 1000
 TIMEOUT = 30
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; AlymenetPublisher/1.0; +https://t.me/ALYMENET)"
+    "User-Agent": "Mozilla/5.0 (compatible; ReutersArPublisher/1.0; +https://t.me/reuters_Ar)"
 }
 
 
@@ -48,7 +48,7 @@ def save_history(history: set[str]) -> None:
 def clean_text(value: str) -> str:
     value = re.sub(
         r"(?:\n+ـ{5,})?\n*للاشتراك(?: بالقناة)? عبر تيليجرام:?\s*\n+"
-        r"https?://t\.me/(?:ALYMENET|ALYEMENNET)\S*.*$",
+        r"https?://t\.me/reuters_Ar\S*.*$",
         "",
         value,
         flags=re.IGNORECASE | re.DOTALL,
@@ -96,7 +96,7 @@ def fetch_posts() -> list[dict[str, str]]:
 
         # للمنشورات التي تحتوي وسائط فقط نستخدم وصفًا مختصرًا.
         if not text:
-            text = "منشور جديد من قناة اليمن نت"
+            text = "منشور جديد من قناة رويترز بالعربية"
 
         posts.append({
             "id": post_id,
