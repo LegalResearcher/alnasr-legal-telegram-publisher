@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """نشر منشورات قناة Telegram العامة @ALYMENET إلى قناة أخرى عبر Bot API.
 
-لا يستخدم Userbot: يقرأ صفحة المعاينة العامة t.me/s ثم ينشر نص الخبر والرابط.
+لا يستخدم Userbot: يقرأ صفحة المعاينة العامة t.me/s ثم ينشر النص والوسائط المتاحة.
 """
 
 import hashlib
@@ -69,22 +69,85 @@ def fetch_posts() -> list[dict[str, str]]:
 
         text = clean_text(text_node.get_text("\n", strip=True) if text_node else "")
         url = post_link.get("href", f"https://t.me/{SOURCE_USERNAME}/{post_id}")
-        # ننسخ المنشورات النصية. للمنشورات التي تحتوي وسائط فقط نرسل الرابط.
+        media_url = ""
+        media_type = ""
+        photo_wrap = wrap.select_one(".tgme_widget_message_photo_wrap")
+        if photo_wrap:
+            style = photo_wrap.get("style", "")
+            match = re.search(r"url\(['\"]?(.*?)['\"]?\)", style)
+            if match:
+                media_url = html.unescape(match.group(1))
+                media_type = "photo"
+
+        video = wrap.select_one("video")
+        if video:
+            source = video.select_one("source")
+            candidate = video.get("src") or (source.get("src") if source else "")
+            if candidate:
+                media_url = candidate
+                media_type = "video"
+
+        # للمنشورات التي تحتوي وسائط فقط نستخدم وصفًا مختصرًا.
         if not text:
             text = "منشور جديد من قناة اليمن نت"
 
-        posts.append({"id": post_id, "text": text, "url": url})
+        posts.append({
+            "id": post_id,
+            "text": text,
+            "url": url,
+            "media_url": media_url,
+            "media_type": media_type,
+        })
 
     return posts
 
 
-def send_to_telegram(post: dict[str, str]) -> bool:
-    message = (
+def format_message(post: dict[str, str]) -> str:
+    return (
         f"{html.escape(post['text'])}\n"
         "ــــــــــــــــــــــــــــ\n"
         "للاشتراك بالقناة عبر تيليجرام:\n"
         "https://t.me/hasadalyoum"
     )
+
+
+def send_to_telegram(post: dict[str, str]) -> bool:
+    message = format_message(post)
+    media_url = post.get("media_url", "")
+    media_type = post.get("media_type", "")
+
+    if media_url and media_type in {"photo", "video"}:
+        try:
+            media_response = requests.get(
+                media_url, headers=HEADERS, timeout=TIMEOUT, stream=True
+            )
+            media_response.raise_for_status()
+            field = media_type
+            endpoint = f"https://api.telegram.org/bot{BOT_TOKEN}/send{field.title()}"
+            payload = {"chat_id": DESTINATION, "parse_mode": "HTML"}
+            if len(message) <= 1024:
+                payload["caption"] = message
+            response = requests.post(
+                endpoint,
+                data=payload,
+                files={field: (f"post_{post['id']}", media_response.raw)},
+                timeout=TIMEOUT,
+            )
+            if not response.ok or not response.json().get("ok"):
+                print(f"Media upload failed: {response.status_code} {response.text}")
+                return False
+            # Captions have a 1024-character limit; send the full text separately.
+            if len(message) > 1024:
+                return send_text_message(message)
+            return True
+        except requests.RequestException as error:
+            print(f"Media transfer failed: {error}")
+            return False
+
+    return send_text_message(message)
+
+
+def send_text_message(message: str) -> bool:
     endpoint = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     response = requests.post(
         endpoint,
