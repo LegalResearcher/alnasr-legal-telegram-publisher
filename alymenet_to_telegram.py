@@ -1,8 +1,7 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""نشر منشورات قناة Telegram العامة @reuters_Ar إلى قناة أخرى عبر Bot API.
+"""نشر منشورات قناتي Telegram العامتين عبر Bot API.
 
-لا يستخدم Userbot: يقرأ صفحة المعاينة العامة t.me/s ثم ينشر النص والوسائط المتاحة.
+لا يستخدم Userbot: يقرأ صفحات المعاينة العامة t.me/s ثم ينشر النص والوسائط المتاحة.
 """
 
 import hashlib
@@ -15,16 +14,16 @@ from pathlib import Path
 import requests
 from bs4 import BeautifulSoup
 
-SOURCE_USERNAME = "reuters_Ar"
-SOURCE_URL = f"https://t.me/s/{SOURCE_USERNAME}"
+SOURCE_USERNAMES = ("AbdmomenShjaaAldeen", "qada_a")
+SOURCE_URLS = [f"https://t.me/s/{username}" for username in SOURCE_USERNAMES]
 BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 DESTINATION = os.environ["TELEGRAM_CHANNEL_ID"]
-HISTORY_FILE = Path(os.environ.get("HISTORY_FILE", "reuters_ar_history.json"))
+HISTORY_FILE = Path(os.environ.get("HISTORY_FILE", "telegram_sources_history.json"))
 MAX_HISTORY = 1000
 TIMEOUT = 30
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; ReutersArPublisher/1.0; +https://t.me/reuters_Ar)"
+    "User-Agent": "Mozilla/5.0 (compatible; TelegramPublisher/1.0; +https://t.me/muen2025)"
 }
 
 
@@ -48,7 +47,7 @@ def save_history(history: set[str]) -> None:
 def clean_text(value: str) -> str:
     value = re.sub(
         r"(?:\n+ـ{5,})?\n*للاشتراك(?: بالقناة)? عبر تيليجرام:?\s*\n+"
-        r"https?://t\.me/reuters_Ar\S*.*$",
+        r"https?://t\.me/(?:AbdmomenShjaaAldeen|qada_a)\S*.*$",
         "",
         value,
         flags=re.IGNORECASE | re.DOTALL,
@@ -56,8 +55,7 @@ def clean_text(value: str) -> str:
     lines = []
     for line in value.splitlines():
         stripped = line.strip()
-        # منشورات Reuters العربية تتبع النص العربي بنسخة إنجليزية.
-        # نوقف القراءة عند أول سطر إنجليزي، مع الإبقاء على الرموز السابقة له.
+        # نحافظ على منطق تنظيف النص العربي نفسه المستخدم في المستودع الأصلي.
         if re.match(r"^[^\u0600-\u06FF\n]*[A-Za-z]", stripped):
             break
         if re.search(r"(?:رويترز|Reuters)\s*[•·-]", stripped):
@@ -75,8 +73,9 @@ def extract_message_text(text_node) -> str:
     return clean_text(text_node.get_text("", strip=False))
 
 
-def fetch_posts() -> list[dict[str, str]]:
-    response = requests.get(SOURCE_URL, headers=HEADERS, timeout=TIMEOUT)
+def fetch_posts(source_username: str) -> list[dict[str, str]]:
+    source_url = f"https://t.me/s/{source_username}"
+    response = requests.get(source_url, headers=HEADERS, timeout=TIMEOUT)
     response.raise_for_status()
     soup = BeautifulSoup(response.text, "html.parser")
     posts = []
@@ -94,7 +93,7 @@ def fetch_posts() -> list[dict[str, str]]:
             continue
 
         text = extract_message_text(text_node) if text_node else ""
-        url = post_link.get("href", f"https://t.me/{SOURCE_USERNAME}/{post_id}")
+        url = post_link.get("href", f"https://t.me/{source_username}/{post_id}")
         media_url = ""
         media_type = ""
         photo_wrap = wrap.select_one(".tgme_widget_message_photo_wrap")
@@ -113,19 +112,27 @@ def fetch_posts() -> list[dict[str, str]]:
                 media_url = candidate
                 media_type = "video"
 
-        # للمنشورات التي تحتوي وسائط فقط نستخدم وصفًا مختصرًا.
         if not text:
-            text = "منشور جديد من قناة رويترز بالعربية"
+            text = f"منشور جديد من قناة {source_username}"
 
         posts.append({
-            # معرّف منشور Telegram ثابت؛ نستخدمه حتى لا تعاد منشورات السجل القديم.
-            "id": post_id,
+            "id": f"{source_username}:{post_id}",
             "text": text,
             "url": url,
             "media_url": media_url,
             "media_type": media_type,
         })
 
+    return posts
+
+
+def fetch_all_posts() -> list[dict[str, str]]:
+    posts = []
+    for source_username in SOURCE_USERNAMES:
+        try:
+            posts.extend(fetch_posts(source_username))
+        except requests.RequestException as error:
+            print(f"تعذر جلب منشورات {source_username}: {error}")
     return posts
 
 
@@ -136,12 +143,11 @@ def format_message(post: dict[str, str]) -> str:
 
     parts = [f"<b>{html.escape(title)}</b>"]
     if summary:
-        # Telegram Bot API يدعم blockquote expandable في HTML.
         parts.append(f"<blockquote expandable>\n{html.escape(summary)}\n</blockquote>")
     parts.append(
         "ــــــــــــــــــــــــــــ\n\n"
         "للاشتراك بالقناة عبر تيليجرام:\n"
-        "https://t.me/hasadalyoum"
+        "https://t.me/muen2025"
     )
     return "\n\n".join(parts)
 
@@ -175,7 +181,6 @@ def send_to_telegram(post: dict[str, str]) -> bool:
             if not response.ok or not response.json().get("ok"):
                 print(f"Media upload failed: {response.status_code} {response.text}")
                 return False
-            # Captions have a 1024-character limit; send the full text separately.
             if len(message) > 1024:
                 return send_text_message(message)
             return True
@@ -206,21 +211,18 @@ def send_text_message(message: str) -> bool:
 
 def main() -> None:
     history = load_history()
-    posts = fetch_posts()
+    posts = fetch_all_posts()
     fresh = [post for post in posts if post["id"] not in history]
 
     if not fresh:
         print("لا توجد منشورات جديدة.")
         return
 
-    # الصفحة مرتبة من الأقدم إلى الأحدث عادةً؛ نرسل بالترتيب الظاهر.
     sent = 0
     for post in fresh:
         if send_to_telegram(post):
             history.add(post["id"])
             sent += 1
-            # حفظ السجل فورًا بعد كل إرسال ناجح لتقليل احتمال إعادة النشر
-            # إذا توقف تشغيل GitHub Actions بعد إرسال الرسالة.
             save_history(history)
 
     save_history(history)
