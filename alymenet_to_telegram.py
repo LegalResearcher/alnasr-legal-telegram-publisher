@@ -118,6 +118,7 @@ def fetch_posts() -> list[dict[str, str]]:
             text = "منشور جديد من قناة رويترز بالعربية"
 
         posts.append({
+            # معرّف منشور Telegram ثابت؛ نستخدمه حتى لا تعاد منشورات السجل القديم.
             "id": post_id,
             "text": text,
             "url": url,
@@ -218,6 +219,9 @@ def main() -> None:
         if send_to_telegram(post):
             history.add(post["id"])
             sent += 1
+            # حفظ السجل فورًا بعد كل إرسال ناجح لتقليل احتمال إعادة النشر
+            # إذا توقف تشغيل GitHub Actions بعد إرسال الرسالة.
+            save_history(history)
 
     save_history(history)
     print(f"تم نشر {sent} من {len(fresh)} منشور جديد.")
