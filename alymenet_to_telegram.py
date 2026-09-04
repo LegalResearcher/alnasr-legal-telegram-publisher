@@ -68,6 +68,13 @@ def clean_text(value: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
 
 
+def extract_message_text(text_node) -> str:
+    """يحافظ على الرموز بجانب النص ويحوّل br إلى فواصل فعلية."""
+    for br in text_node.find_all("br"):
+        br.replace_with("\n")
+    return clean_text(text_node.get_text("", strip=False))
+
+
 def fetch_posts() -> list[dict[str, str]]:
     response = requests.get(SOURCE_URL, headers=HEADERS, timeout=TIMEOUT)
     response.raise_for_status()
@@ -86,7 +93,7 @@ def fetch_posts() -> list[dict[str, str]]:
         if not post_id:
             continue
 
-        text = clean_text(text_node.get_text("\n", strip=True) if text_node else "")
+        text = extract_message_text(text_node) if text_node else ""
         url = post_link.get("href", f"https://t.me/{SOURCE_USERNAME}/{post_id}")
         media_url = ""
         media_type = ""
@@ -129,7 +136,7 @@ def format_message(post: dict[str, str]) -> str:
     parts = [f"<b>{html.escape(title)}</b>"]
     if summary:
         # Telegram Bot API يدعم blockquote expandable في HTML.
-        parts.append(f"<blockquote expandable>{html.escape(summary)}</blockquote>")
+        parts.append(f"<blockquote expandable>\n{html.escape(summary)}\n</blockquote>")
     parts.append(
         "ــــــــــــــــــــــــــــ\n\n"
         "للاشتراك بالقناة عبر تيليجرام:\n"
@@ -151,7 +158,11 @@ def send_to_telegram(post: dict[str, str]) -> bool:
             media_response.raise_for_status()
             field = media_type
             endpoint = f"https://api.telegram.org/bot{BOT_TOKEN}/send{field.title()}"
-            payload = {"chat_id": DESTINATION, "parse_mode": "HTML"}
+            payload = {
+                "chat_id": DESTINATION,
+                "parse_mode": "HTML",
+                "disable_web_page_preview": True,
+            }
             if len(message) <= 1024:
                 payload["caption"] = message
             response = requests.post(
@@ -182,7 +193,7 @@ def send_text_message(message: str) -> bool:
             "chat_id": DESTINATION,
             "text": message,
             "parse_mode": "HTML",
-            "disable_web_page_preview": False,
+            "disable_web_page_preview": True,
         },
         timeout=TIMEOUT,
     )
