@@ -1,0 +1,55 @@
+name: نشر منشورات ALYMENET
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: alymenet-publisher
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: سحب الكود
+        uses: actions/checkout@v4
+
+      - name: إعداد Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: تثبيت المكتبات
+        run: pip install -r requirements.txt
+
+      - name: استعادة سجل المنشورات
+        uses: actions/cache@v4
+        with:
+          path: alymenet_history.json
+          key: alymenet-history-${{ github.run_id }}
+          restore-keys: |
+            alymenet-history-
+
+      - name: تشغيل الناشر
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHANNEL_ID: ${{ vars.TELEGRAM_CHANNEL_ID }}
+        run: python alymenet_to_telegram.py
+
+      - name: حفظ سجل المنشورات في المستودع
+        if: success()
+        run: |
+          if [ -f alymenet_history.json ] && [ -n "$(git status --porcelain alymenet_history.json)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add alymenet_history.json
+            git commit -m "chore: update Alymenet history" || true
+            git push || true
+          fi
