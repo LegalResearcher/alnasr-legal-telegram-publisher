@@ -80,10 +80,10 @@ def fetch_posts() -> list[dict[str, str]]:
 
 def send_to_telegram(post: dict[str, str]) -> bool:
     message = (
-        "<b>📰 خبر جديد</b>\n\n"
-        f"{html.escape(post['text'])}\n\n"
+        f"{html.escape(post['text'])}\n"
         "ــــــــــــــــــــــــــــ\n"
-        f"المصدر: <a href=\"{html.escape(post['url'], quote=True)}\">@ALYMENET</a>"
+        "للاشتراك بالقناة عبر تيليجرام:\n"
+        "https://t.me/hasadalyoum"
     )
     endpoint = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     response = requests.post(
