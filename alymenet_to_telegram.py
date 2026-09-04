@@ -46,6 +46,13 @@ def save_history(history: set[str]) -> None:
 
 
 def clean_text(value: str) -> str:
+    value = re.sub(
+        r"(?:\n+ـ{5,})?\n*للاشتراك(?: بالقناة)? عبر تيليجرام:?\s*\n+"
+        r"https?://t\.me/(?:ALYMENET|ALYEMENNET)\S*.*$",
+        "",
+        value,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
     return re.sub(r"\n{3,}", "\n\n", value).strip()
 
 
