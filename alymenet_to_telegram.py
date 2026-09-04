@@ -122,13 +122,20 @@ def fetch_posts() -> list[dict[str, str]]:
 
 
 def format_message(post: dict[str, str]) -> str:
-    body = (
-        f"{html.escape(post['text'])}\n"
+    paragraphs = [part.strip() for part in re.split(r"\n\s*\n", post["text"]) if part.strip()]
+    title = paragraphs[0] if paragraphs else post["text"]
+    summary = "\n\n".join(paragraphs[1:])
+
+    parts = [f"<b>{html.escape(title)}</b>"]
+    if summary:
+        # Telegram Bot API يدعم blockquote expandable في HTML.
+        parts.append(f"<blockquote expandable>{html.escape(summary)}</blockquote>")
+    parts.append(
         "ــــــــــــــــــــــــــــ\n\n"
         "للاشتراك بالقناة عبر تيليجرام:\n"
         "https://t.me/hasadalyoum"
     )
-    return f"<b>{body}</b>"
+    return "\n\n".join(parts)
 
 
 def send_to_telegram(post: dict[str, str]) -> bool:
